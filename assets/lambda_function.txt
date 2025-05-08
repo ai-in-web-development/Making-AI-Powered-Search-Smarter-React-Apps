@@ -1,0 +1,51 @@
+import boto3
+import json
+
+bedrock_runtime = boto3.client(service_name='bedrock-agent-runtime', region_name='us-west-2')
+knowledge_base_id = '..'
+model_arn = 'arn:aws:bedrock:us-west-2:888577051377:inference-profile/us.amazon.nova-lite-v1:0'
+
+def retrieveAndGenerate(input_text, kbId, modelArn=None):
+    response = bedrock_runtime.retrieve_and_generate(
+        input={
+            'text': input_text
+        },
+        retrieveAndGenerateConfiguration={
+            'knowledgeBaseConfiguration': {
+                'knowledgeBaseId': kbId,
+                'modelArn': modelArn
+            },
+            'type': 'KNOWLEDGE_BASE'
+        }
+    )
+    
+    return response
+# {
+#   "input_text": "what are the working conditions of Myanmar factories"
+# }
+def lambda_handler(event, context):
+    print(boto3.__version__)
+    input_text = event['input_text']
+    
+    # Invoke the knowledge base model
+    response = retrieveAndGenerate(input_text, knowledge_base_id, model_arn)
+    # Process the response
+    response_body = response
+    
+    # Extract the relevant information from the response
+    citations = response_body.get('citations', [])
+    guardrail_action = response_body.get('guardrailAction', 'NONE')
+    output_text = response_body.get('output', {}).get('text', '')
+
+    # Construct the result JSON
+    result_json = {
+        'citations': citations,
+        'guardrailAction': guardrail_action,
+        'output': output_text
+    }
+    
+    # Return the processed result in typical Lambda response format
+    return {
+        "statusCode": 200,
+        "body": json.dumps(result_json)
+    }
